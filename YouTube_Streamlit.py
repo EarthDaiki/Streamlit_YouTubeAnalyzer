@@ -1,3 +1,5 @@
+#https://youtubeexpert-earthstation.streamlit.app/
+
 import streamlit as st
 import subprocess
 import json
@@ -11,6 +13,7 @@ import pandas as pd
 from yt_dlp import YoutubeDL
 import os
 
+Filename=None
 TimeStampList = []
 AuthorNameList = []
 CommentList = []
@@ -367,9 +370,9 @@ def VideoDownloader():
     with YoutubeDL(ydl_options) as ydl:
         info = ydl.extract_info(UrlForDownload)
         Filename = ydl.prepare_filename(info)
-        try:
+        try:                
             if Format == 'mp4' or Format == 'mp4+m4a(スマートフォンの場合はこちらを選択してください)':
-                Filename = ConvertToMP4(Filename)
+                Filename = ConvertToMP4(Filename, info)
         except:
             ErrorMessage('Convert')
             exit()
@@ -415,27 +418,32 @@ def PartVideoDownloadProcess(PartVideoDownloader, i, Str_StartTime, Str_EndTime,
         st.error("error")
     return Filename
 
-def ConvertToMP4(Filename):
+def ConvertToMP4(Filename, info):
     WebmFilename = Filename
     if Format == 'mp4':
         MP4Filename = Filename.replace('.webm', '.mp4')
     if Format == 'mp4+m4a(スマートフォンの場合はこちらを選択してください)':
         MP4Filename = Filename.replace('.mkv', '.mp4')
     if os.path.exists(MP4Filename):
-        os.remove(MP4Filename)
+        if not info['ext'] == 'mp4':
+            os.remove(MP4Filename)
     if Format == 'mp4':
-        command = f'ffmpeg -i "{WebmFilename}" -c:v copy -c:a copy "{MP4Filename}"'
-        subprocess.run(command, shell=True)
+        if not info['ext'] == 'mp4':
+            command = f'ffmpeg -i "{WebmFilename}" -c:v copy -c:a copy "{MP4Filename}"'
+            subprocess.run(command, shell=True)
     if Format == 'mp4+m4a(スマートフォンの場合はこちらを選択してください)':
         command = f'ffmpeg -i "{WebmFilename}" -c:v libx264 -profile:v high -level:v 4.0 -crf 18 -c:a copy "{MP4Filename}"'
         subprocess.run(command, shell=True)
-    os.remove(WebmFilename)
+    if not info['ext'] == 'mp4':
+        os.remove(WebmFilename)
     return MP4Filename
 
 def Callback():
     st.write(st.session_state.submit_state)
 
-def OnChangeVideo():
+def OnChangeVideo(Filename):
+    if not Filename == None:
+        os.remove(Filename)
     VideoDownloader.clear()
 
 def OnChangeAudio():
@@ -563,7 +571,7 @@ with st.form(key='download'):
     col1, col2 = st.columns(2)
     with col1:
         Format = st.radio('**形式を選んでください**', ('webm', 'mp4', 'mp4+m4a(スマートフォンの場合はこちらを選択してください)'), horizontal=True, key='downloader', help='スマートフォンからアクセスの場合はmp4選択してください')
-        VideoDownload = st.form_submit_button('動画全体をダウンロード', on_click=OnChangeVideo)
+        VideoDownload = st.form_submit_button('動画全体をダウンロード', on_click=OnChangeVideo, args=(Filename,))
     with col2:
         st.markdown('**音声ファイルはmp3です**')
         AudioDownload = st.form_submit_button('音声のみをダウンロード', on_click=OnChangeAudio)
