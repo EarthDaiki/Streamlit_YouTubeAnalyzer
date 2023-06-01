@@ -432,7 +432,7 @@ def ConvertToMP4(Filename, info):
             command = f'ffmpeg -i "{WebmFilename}" -c:v copy -c:a copy "{MP4Filename}"'
             subprocess.run(command, shell=True)
     if Format == 'mp4+m4a(スマートフォンの場合はこちらを選択してください)':
-        command = f'ffmpeg -i "{WebmFilename}" -c:v libx264 -profile:v high -level:v 4.0 -crf 18 -c:a copy "{MP4Filename}"'
+        command = f'ffmpeg -i "{WebmFilename}" -c:v libx264 -profile:v high -level:v 4.0 -crf 22 -c:a copy "{MP4Filename}"'
         subprocess.run(command, shell=True)
     if not info['ext'] == 'mp4':
         os.remove(WebmFilename)
