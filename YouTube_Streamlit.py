@@ -567,16 +567,16 @@ if submit_btn or st.session_state.Submit:
                 ShowReplayDataframe(IntensityList, TimeDeltaList, Seconds_StartTime, Seconds_EndTime, df, df_sorted)
             st.success('完了しました。')
 
-st.title('動画ダウンロード🚀', help='最高品質でダウンロードできます！(webm, mp4, mp3)  \n*YouTube以外にも対応しています(詳細は右上の三本線から"Get help"をクリック)  \n*ログインが必要なサイトの動画はダウンロードできません  \n*音声または映像が再生されない場合は動画再生アプリを変更してください(推奨: VLC Media Player)  \n*スマートフォンのための処理(mp4+m4a)は大変重いため再生されない場合があります。再生されなかった場合は別の動画をお試しください。')
+st.title('動画ダウンロード🚀', help='最高品質でダウンロードできます！(webm, mp4, mp3)  \n*YouTube以外にも対応しています(詳細は右上の三本線から"Get help"をクリック)  \n*ログインが必要なサイトの動画はダウンロードできません  \n*音声または映像が再生されない場合は動画再生アプリを変更してください(推奨: VLC Media Player)  \n*スマートフォンのための処理(mp4+m4a)は大変重いため再生されない場合があります。再生されなかった場合は別の動画をお試しください。  \nユーザー名/パスワードはダウンロードする際にログインが必要な場合のみ打ち込んでください！')
 with st.form(key='download'):
     UrlForDownload = st.text_input('**ダウンロードしたい動画のURLを入れてください**', placeholder='https://www.youtube.com/watch?v=, https://www.twitch.tv/videos/, etc...')
     col1, col2 = st.columns(2)
     with col1:
-        username = st.text_input("username", placeholder='username')
+        username = st.text_input("username (オプション)", placeholder='username')
         Format = st.radio('**形式を選んでください**', ('webm', 'mp4', 'mp4+m4a(スマートフォンの場合はこちらを選択してください)'), horizontal=True, key='downloader', help='スマートフォンからアクセスの場合はmp4選択してください')
         VideoDownload = st.form_submit_button('動画全体をダウンロード', on_click=OnChangeVideo, args=(Filename,))
     with col2:
-        password = st.text_input("password", type='password', placeholder='password')
+        password = st.text_input("password (オプション)", type='password', placeholder='password')
         st.markdown('**音声ファイルはmp3です**')
         AudioDownload = st.form_submit_button('音声のみをダウンロード', on_click=OnChangeAudio)
 
