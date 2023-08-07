@@ -356,7 +356,7 @@ def PartVideoDownloadBtn(Filename):
         st.download_button(label=':red[Download]🍿', data=data, file_name=Filename, mime='video/mp4')
 
 @st.cache_data(max_entries=1)
-def VideoDownloader():
+def VideoDownloader(username, password):
     if Format == 'mp4+m4a(スマートフォンの場合はこちらを選択してください)':
         VideoFormat = 'bestvideo+bestaudio[ext=m4a]/best'
     else:
@@ -364,7 +364,9 @@ def VideoDownloader():
 
     ydl_options={
         "format" : VideoFormat,
-        'outtmpl': '%(title)s[%(id)s].%(ext)s'
+        'outtmpl': '%(title)s[%(id)s].%(ext)s',
+        'username': username,
+        'password': password
     }
 
     with YoutubeDL(ydl_options) as ydl:
@@ -570,9 +572,11 @@ with st.form(key='download'):
     UrlForDownload = st.text_input('**ダウンロードしたい動画のURLを入れてください**', placeholder='https://www.youtube.com/watch?v=, https://www.twitch.tv/videos/, etc...')
     col1, col2 = st.columns(2)
     with col1:
+        username = st.text_input("username", placeholder='username')
         Format = st.radio('**形式を選んでください**', ('webm', 'mp4', 'mp4+m4a(スマートフォンの場合はこちらを選択してください)'), horizontal=True, key='downloader', help='スマートフォンからアクセスの場合はmp4選択してください')
         VideoDownload = st.form_submit_button('動画全体をダウンロード', on_click=OnChangeVideo, args=(Filename,))
     with col2:
+        password = st.text_input("password", type='password', placeholder='password')
         st.markdown('**音声ファイルはmp3です**')
         AudioDownload = st.form_submit_button('音声のみをダウンロード', on_click=OnChangeAudio)
 
@@ -584,7 +588,7 @@ with col1:
             exit()
         with st.spinner('ロード中・・・'):
             try:
-                Filename = VideoDownloader()
+                Filename = VideoDownloader(username, password)
             except:
                 ErrorMessage('URL')
                 exit()
