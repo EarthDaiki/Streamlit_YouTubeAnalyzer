@@ -1,4 +1,4 @@
-#https://youtubeexpert-earthstation.streamlit.app/
+#https://youtubeexpert--earthstation.streamlit.app/
 
 import streamlit as st
 import subprocess
@@ -12,8 +12,13 @@ from bs4 import BeautifulSoup
 import pandas as pd
 from yt_dlp import YoutubeDL
 import os
+from time import sleep
 
+toast_video = True
+toast_music = True
 Filename=None
+resolutions = []
+vcodecs = []
 TimeStampList = []
 AuthorNameList = []
 CommentList = []
@@ -35,7 +40,7 @@ st.set_page_config(
         }
     )
 
-@st.cache_data
+@st.cache_data(show_spinner='Livechat情報をロード中・・・')
 def DownloadLiveChat(url):
     #try:
     # Livechat = f"youtube-dl --skip-download --write-sub --sub-lang live_chat --get-filename --restrict-filenames {url}"
@@ -187,7 +192,7 @@ def GetTimeStamp(Interval, counts):
         # st.text(f"EndTime: {int(Seconds_EndTime)}")
 
         GetVideos(Seconds_StartTime, Seconds_EndTime)
-        Format = st.radio('**形式を選んでください**', ('webm', 'mp4', 'mp4+m4a(スマートフォンの場合はこちらを選択してください)'), horizontal=True, key=f'livechat{i}', help='スマートフォンからアクセスの場合はmp4選択してください')
+        Format = st.radio('**形式を選んでください**', ('webm', 'mp4', 'mp4+m4a(IOSの場合はこちらを選択してください)'), horizontal=True, key=f'livechat{i}', help='スマートフォンからアクセスの場合はmp4選択してください')
         LivechatVideoDownload = st.button(f'ダウンロード{i}',help='こちらでの部分的なダウンロードはまだ開発途中のため音声や映像がずれる場合があります。  \n結果を確認しながら、下の"動画ダウンロード"で全体をダウンロードして、ご自身でトリムすることをお勧めします。')
         if LivechatVideoDownload:
             return i, Seconds_StartTime, Seconds_EndTime, LivechatVideoDownload, Format
@@ -213,7 +218,7 @@ def ErrorMessage(Error):
     elif Error == "Convert":
         st.error('mp4にコンバートする際にエラーが起きました')
 
-@st.cache_data
+@st.cache_data(show_spinner='リプレイ情報をロード中・・・')
 def GetMostReplayedFromBrowser():
     url = f'https://yt.lemnoslife.com/videos?part=mostReplayed&id={VideoId}'
     response = requests.get(url, verify=False)
@@ -328,7 +333,7 @@ def PartVideoDownloader(i, Seconds_StartTime, Seconds_EndTime, Format):
         }]
         return duration_opt
     
-    if Format == 'mp4+m4a(スマートフォンの場合はこちらを選択してください)':
+    if Format == 'mp4+m4a(IOSの場合はこちらを選択してください)':
         VideoFormat = 'bestvideo+bestaudio[ext=m4a]/best'
     else:
         VideoFormat = 'bestvideo+bestaudio/best'
@@ -341,23 +346,24 @@ def PartVideoDownloader(i, Seconds_StartTime, Seconds_EndTime, Format):
     with YoutubeDL(ydl_options) as ydl:
         info = ydl.extract_info(url)
         Filename = ydl.prepare_filename(info)
-        try:
-            if Format == 'mp4' or Format == 'mp4+m4a(スマートフォンの場合はこちらを選択してください)':
-                Filename = ConvertToMP4(Filename)
+        convert = FindResolutions(info)
+        try:                
+            if Format == 'mp4' or (Format == 'mp4+m4a(IOSの場合はこちらを選択してください)' and convert):
+                Filename = ConvertToMP4(Filename, info)
         except:
             ErrorMessage('Convert')
             exit()
         st.video(Filename)
-    return Filename
+    return Filename, info
 
 def PartVideoDownloadBtn(Filename):
     # Filename = Filename.replace('.webm', '.mp4')
     with open (Filename, 'rb') as data:
         st.download_button(label=':red[Download]🍿', data=data, file_name=Filename, mime='video/mp4')
 
-@st.cache_data(max_entries=1)
+@st.cache_resource(max_entries=1, show_spinner='ロード中😍')
 def VideoDownloader(username, password):
-    if Format == 'mp4+m4a(スマートフォンの場合はこちらを選択してください)':
+    if Format == 'mp4+m4a(IOSの場合はこちらを選択してください)':
         VideoFormat = 'bestvideo+bestaudio[ext=m4a]/best'
     else:
         VideoFormat = 'bestvideo+bestaudio/best'
@@ -372,20 +378,22 @@ def VideoDownloader(username, password):
     with YoutubeDL(ydl_options) as ydl:
         info = ydl.extract_info(UrlForDownload)
         Filename = ydl.prepare_filename(info)
+        convert = FindResolutions(info)
         try:                
-            if Format == 'mp4' or Format == 'mp4+m4a(スマートフォンの場合はこちらを選択してください)':
+            if Format == 'mp4' or (Format == 'mp4+m4a(IOSの場合はこちらを選択してください)' and convert):
                 Filename = ConvertToMP4(Filename, info)
         except:
             ErrorMessage('Convert')
             exit()
+        st.markdown('Video Preview')
         st.video(Filename)
-    return Filename
+    return Filename, info
 
 def VideoDownloadBtn(Filename):
     with open (Filename, 'rb') as data:
         btn = st.download_button(label=':red[Download]🍿', data=data, file_name=Filename, mime='video/mp4')
 
-@st.cache_data(max_entries=1)
+@st.cache_data(max_entries=1, show_spinner='ロード中😍')
 def AudioDownloader():
     ydl_options={
         'format': 'bestaudio/best',
@@ -401,6 +409,7 @@ def AudioDownloader():
         info = ydl.extract_info(UrlForDownload)
         Filename = ydl.prepare_filename(info)
         Filename = Filename.replace('.webm', '.mp3').replace('.mp4', '.mp3')
+        st.markdown('Sound Preview')
         st.audio(Filename, format="audio/mp3")
     return Filename
 
@@ -414,17 +423,17 @@ def PartVideoDownloadProcess(PartVideoDownloader, i, Str_StartTime, Str_EndTime,
         if MostReplayedVideoDownload:
             i = 'MostReplayed'
         with st.spinner('ロード中・・・'):
-            Filename = PartVideoDownloader(i, Str_StartTime, Str_EndTime, Format)
+            Filename, info = PartVideoDownloader(i, Str_StartTime, Str_EndTime, Format)
             # st.success('ダウンロード完了しました。')
     if Filename is None:
         st.error("error")
-    return Filename
+    return Filename, info
 
 def ConvertToMP4(Filename, info):
     WebmFilename = Filename
     if Format == 'mp4':
         MP4Filename = Filename.replace('.webm', '.mp4')
-    if Format == 'mp4+m4a(スマートフォンの場合はこちらを選択してください)':
+    if Format == 'mp4+m4a(IOSの場合はこちらを選択してください)':
         MP4Filename = Filename.replace('.mkv', '.mp4')
     if os.path.exists(MP4Filename):
         if not info['ext'] == 'mp4':
@@ -433,12 +442,43 @@ def ConvertToMP4(Filename, info):
         if not info['ext'] == 'mp4':
             command = f'ffmpeg -i "{WebmFilename}" -c:v copy -c:a copy "{MP4Filename}"'
             subprocess.run(command, shell=True)
-    if Format == 'mp4+m4a(スマートフォンの場合はこちらを選択してください)':
-        command = f'ffmpeg -i "{WebmFilename}" -c:v libx264 -profile:v high -level:v 4.0 -crf 22 -c:a copy "{MP4Filename}"'
-        subprocess.run(command, shell=True)
+    if Format == 'mp4+m4a(IOSの場合はこちらを選択してください)':
+        with st.spinner('H.264に圧縮中'):
+            command = f'ffmpeg -i "{WebmFilename}" -c:v libx264 -profile:v high -level:v 4.0 -crf 22 -c:a copy "{MP4Filename}"'
+            subprocess.run(command, shell=True)
     if not info['ext'] == 'mp4':
         os.remove(WebmFilename)
     return MP4Filename
+
+def FindResolutions(info):
+    ResolutionCount = 0
+    HighResolutions = 0
+    ErrorCount = 0
+    while(True):
+        try:
+            resolution = info['formats'][ResolutionCount]['resolution']
+            resolutions.append(resolution)
+
+            vcodec = info['formats'][ResolutionCount]['vcodec']
+            vcodecs.append(vcodec)
+            ResolutionCount+=1
+        except:
+            ErrorCount+=1
+            break
+
+    HighestResolution = resolutions[-1]
+    for count, resolution in enumerate(resolutions):
+        if (resolution == HighestResolution):
+            HighResolutions+=1
+
+    for resolution in vcodecs[-HighResolutions:]:
+        if (vcodecs[-1] == resolution):
+            convert = True
+        else:
+            convert = False
+            break
+    
+    return convert
 
 def Callback():
     st.write(st.session_state.submit_state)
@@ -524,48 +564,46 @@ if submit_btn or st.session_state.Submit:
     if Livechat_checkbox:
         st.session_state.Livechat = True
         st.text(f'{Interval}{Scale}づつ目盛りを分けます')
-        with st.spinner('Livechat情報をロード中・・・'):
-            with st.expander('Livechatデータ'):
-                try:
-                    Livechat = DownloadLiveChat(url)
-                    Livechat = FindElements(Livechat)
-                except:
-                    ErrorMessage('Livechat')
-                    exit()
-                csv_df, counts = ShowCommentCount(Livechat)
+        with st.expander('Livechatデータ'):
+            try:
+                Livechat = DownloadLiveChat(url)
+                Livechat = FindElements(Livechat)
+            except:
+                ErrorMessage('Livechat')
+                exit()
+            csv_df, counts = ShowCommentCount(Livechat)
 
-                # グラフ表示
-                ShowChart(counts)
+            # グラフ表示
+            ShowChart(counts)
 
-                ShowTables(counts)
-                i, Seconds_StartTime, Seconds_EndTime, LivechatVideoDownload, Format = GetTimeStamp(Interval, counts)
-                if LivechatVideoDownload:
-                    Filename = PartVideoDownloadProcess(PartVideoDownloader, i, Seconds_StartTime, Seconds_EndTime, LivechatVideoDownload, None, Format)
-                    PartVideoDownloadBtn(Filename)
-                    os.remove(Filename)
-            st.success('完了しました。')
+            ShowTables(counts)
+            i, Seconds_StartTime, Seconds_EndTime, LivechatVideoDownload, Format = GetTimeStamp(Interval, counts)
+            if LivechatVideoDownload:
+                Filename = PartVideoDownloadProcess(PartVideoDownloader, i, Seconds_StartTime, Seconds_EndTime, LivechatVideoDownload, None, Format)
+                PartVideoDownloadBtn(Filename)
+                os.remove(Filename)
+        st.success('完了しました。')
     if MostReplayed_checkbox and submit_btn or st.session_state.MostReplayed:
-        with st.spinner('リプレイ情報をロード中・・・'):
-            with st.expander('リプレイ回数データ'):
-                json_data = GetMostReplayedFromBrowser()
-                FormatMostReplayed(json_data)
-                try:
-                    TimeDelta_StartTime, TimeDelta_EndTime, Seconds_StartTime, Seconds_EndTime, TimeDeltaList, IntensityList, df, df_sorted = GetMostReplayedInformation()
-                except:
-                    ErrorMessage('Replay')
-                    exit()
-                st.session_state.MostReplayed = True
-                ShowReplayChart(df)
-                ShowMostReplayRange(TimeDelta_StartTime, TimeDelta_EndTime)
-                GetVideos(Seconds_StartTime, Seconds_EndTime)
-                Format = st.radio('**形式を選んでください**', ('webm', 'mp4', 'mp4+m4a(スマートフォンの場合はこちらを選択してください)'), horizontal=True, key='MostReplayed_key', help='スマートフォンからアクセスの場合はmp4選択してください')
-                MostReplayedVideoDownload = st.button('リプレイ回数が最も多い部分の動画をダウンロード')
-                if MostReplayedVideoDownload:
-                    Filename = PartVideoDownloadProcess(PartVideoDownloader, 'MostReplayed', Seconds_StartTime, Seconds_EndTime, None, MostReplayedVideoDownload, Format)
-                    PartVideoDownloadBtn(Filename)
-                    os.remove(Filename)
-                ShowReplayDataframe(IntensityList, TimeDeltaList, Seconds_StartTime, Seconds_EndTime, df, df_sorted)
-            st.success('完了しました。')
+        with st.expander('リプレイ回数データ'):
+            json_data = GetMostReplayedFromBrowser()
+            FormatMostReplayed(json_data)
+            try:
+                TimeDelta_StartTime, TimeDelta_EndTime, Seconds_StartTime, Seconds_EndTime, TimeDeltaList, IntensityList, df, df_sorted = GetMostReplayedInformation()
+            except:
+                ErrorMessage('Replay')
+                exit()
+            st.session_state.MostReplayed = True
+            ShowReplayChart(df)
+            ShowMostReplayRange(TimeDelta_StartTime, TimeDelta_EndTime)
+            GetVideos(Seconds_StartTime, Seconds_EndTime)
+            Format = st.radio('**形式を選んでください**', ('webm', 'mp4', 'mp4+m4a(IOSの場合はこちらを選択してください)'), horizontal=True, key='MostReplayed_key', help='IPhone, IPad, Macからアクセスの場合はmp4+m4aを選択してください')
+            MostReplayedVideoDownload = st.button('リプレイ回数が最も多い部分の動画をダウンロード')
+            if MostReplayedVideoDownload:
+                Filename, info = PartVideoDownloadProcess(PartVideoDownloader, 'MostReplayed', Seconds_StartTime, Seconds_EndTime, None, MostReplayedVideoDownload, Format)
+                PartVideoDownloadBtn(Filename)
+                os.remove(Filename)
+            ShowReplayDataframe(IntensityList, TimeDeltaList, Seconds_StartTime, Seconds_EndTime, df, df_sorted)
+        st.success('完了しました。')
 
 st.title('動画ダウンロード🚀', help='最高品質でダウンロードできます！(webm, mp4, mp3)  \n*YouTube以外にも対応しています(詳細は右上の三本線から"Get help"をクリック)  \n*ログインが必要なサイトの動画はダウンロードできません  \n*音声または映像が再生されない場合は動画再生アプリを変更してください(推奨: VLC Media Player)  \n*スマートフォンのための処理(mp4+m4a)は大変重いため再生されない場合があります。再生されなかった場合は別の動画をお試しください。  \nユーザー名/パスワードはダウンロードする際にログインが必要な場合のみ打ち込んでください！')
 with st.form(key='download'):
@@ -573,40 +611,48 @@ with st.form(key='download'):
     col1, col2 = st.columns(2)
     with col1:
         username = st.text_input("username (オプション)", placeholder='username')
-        Format = st.radio('**形式を選んでください**', ('webm', 'mp4', 'mp4+m4a(スマートフォンの場合はこちらを選択してください)'), horizontal=True, key='downloader', help='スマートフォンからアクセスの場合はmp4選択してください')
-        VideoDownload = st.form_submit_button('動画全体をダウンロード', on_click=OnChangeVideo, args=(Filename,))
+        Format = st.radio('**形式を選んでください**', ('webm', 'mp4', 'mp4+m4a(IOSの場合はこちらを選択してください)'), horizontal=True, key='downloader', help='IPhone, IPad, Macからアクセスの場合はmp4+m4aを選択してください')
+        VideoDownload = st.form_submit_button('動画全体をロード', on_click=OnChangeVideo, args=(Filename,))
     with col2:
         password = st.text_input("password (オプション)", type='password', placeholder='password')
         st.markdown('**音声ファイルはmp3です**')
-        AudioDownload = st.form_submit_button('音声のみをダウンロード', on_click=OnChangeAudio)
+        AudioDownload = st.form_submit_button('音声のみをロード', on_click=OnChangeAudio)
 
-col1, col2, col3 = st.columns(3)
+col1, col2 = st.columns(2)
 with col1:
     if VideoDownload or st.session_state.download_video:
         if not UrlForDownload:
             ErrorMessage('FilledIn')
             exit()
-        with st.spinner('ロード中・・・'):
-            try:
-                Filename = VideoDownloader(username, password)
-            except:
-                ErrorMessage('URL')
-                exit()
-            st.session_state.download_video = True
-            VideoDownloadBtn(Filename)
+        try:
+            Filename, info = VideoDownloader(username, password)
+        except:
+            ErrorMessage('URL')
+            exit()
+        st.session_state.download_video = True
+        VideoDownloadBtn(Filename)
+        # if toast_video:
+        #     st.toast('ウェブ上にダウンロードされました！', icon='🥳')
+        #     sleep(1)
+        #     st.toast(':red[Download]🍿から動画を端末にダウンロードしてください！', icon='🍿')
+        #     toast_video = False
 with col2:
     if AudioDownload or st.session_state.download_audio:
         if not UrlForDownload:
             ErrorMessage('FilledIn')
             exit()
-        with st.spinner('ロード中・・・'):
-            try:
-                Filename = AudioDownloader()
-            except:
-                ErrorMessage('URL')
-                exit()
-            st.session_state.download_audio = True
-            AudioDownloadBtn(Filename)
+        try:
+            Filename = AudioDownloader()
+        except:
+            ErrorMessage('URL')
+            exit()
+        st.session_state.download_audio = True
+        AudioDownloadBtn(Filename)
+        # if toast_music:
+        #     st.toast('ウェブ上にダウンロードされました！', icon='🥳')
+        #     sleep(1)
+        #     st.toast(':red[Download]🎵から動画を端末にダウンロードしてください！', icon='🎵')
+        #     toast_music = False
 
 refresh = st.button("キャッシュを消す")
 if refresh:
