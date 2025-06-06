@@ -1,4 +1,8 @@
 #https://youtubeexpert--earthstation.streamlit.app/
+#字幕にhotspotsを入れる
+# 投稿者の動画の長さの需要
+# 投稿者の動画の需要のジャンル
+# rapid apiを使用してみる
 
 import streamlit as st
 import subprocess
@@ -70,6 +74,7 @@ def FindAuthor(line):
 def FindElements(Livechat):
     count = 0
     Livechat = Livechat.replace(".webm", ".live_chat.json")
+    st.session_state.live_chat_path = Livechat
     # LivechatFileName = f"{Livechat}.live_chat.json"
     # print(LivechatFileName)
     with open(Livechat, encoding="utf-8") as f:
@@ -221,7 +226,7 @@ def ErrorMessage(Error):
 @st.cache_data(show_spinner='リプレイ情報をロード中・・・')
 def GetMostReplayedFromBrowser():
     url = f'https://yt.lemnoslife.com/videos?part=mostReplayed&id={VideoId}'
-    response = requests.get(url, verify=False)
+    response = requests.get(url, verify=True)
     soup = BeautifulSoup(response.text, 'html.parser')
     HTMLText = soup.text
     HTMLText = HTMLText.replace(" ", "").replace("\n", "")
@@ -238,6 +243,7 @@ def FormatMostReplayed(json_data):
         t = t.rstrip('"')
     with open(f"{VideoId}_MostReplayed.json", "w") as f:
         f.write(t)
+        st.session_state.most_replayed_path = f"{VideoId}_MostReplayed.json"
 
 def GetMostReplayedInformation():
     TimeList = []
@@ -246,24 +252,24 @@ def GetMostReplayedInformation():
     with open(f"{VideoId}_MostReplayed.json") as f:
         data = f.read()
         json_dict = json.loads(data)
-        Datas = json_dict['items'][0]['mostReplayed']['heatMarkers']
+        Datas = json_dict['items'][0]['mostReplayed']['markers']
         for Data in Datas:
-            Time = Data['heatMarkerRenderer']['timeRangeStartMillis']
-            Intensity = Data['heatMarkerRenderer']['heatMarkerIntensityScoreNormalized']
+            Time = Data['startMillis']
+            Intensity = Data['intensityScoreNormalized']
             if len(str(Time)) >= 4:
                 Time = str(Time)[:-3]
                 #Time = int(Time) / 60
                 TimeList.append(int(Time))
                 IntensityList.append(Intensity)
-            #print(f"{Time}s // {Intensity}")
+            # print(f"{Time}s // {Intensity}")
 
 
-    MostReplayedDatas = json_dict['items'][0]['mostReplayed']['heatMarkersDecorations']
+    MostReplayedDatas = json_dict['items'][0]['mostReplayed']['timedMarkerDecorations']
     for Data in MostReplayedDatas:
-        StartTime = Data['timedMarkerDecorationRenderer']['visibleTimeRangeStartMillis']
-        EndTime = Data['timedMarkerDecorationRenderer']['visibleTimeRangeEndMillis']
+        StartTime = Data['visibleTimeRangeStartMillis']
+        EndTime = Data['visibleTimeRangeEndMillis']
         # youtube上にハイライトされている時間
-        DecorationTimeMillis = Data['timedMarkerDecorationRenderer']['visibleTimeRangeEndMillis']
+        DecorationTimeMillis = Data['visibleTimeRangeEndMillis']
         if len(str(StartTime)) >= 4:
             StartTime = str(StartTime)[:-3]
         if len(str(EndTime)) >= 4:
@@ -521,6 +527,11 @@ if "download_video" not in st.session_state:
 if "download_audio" not in st.session_state:
     st.session_state.download_audio = False
 
+if "live_chat_path" not in st.session_state:
+    st.session_state.live_chat_path = None
+if "most_replayed_path" not in st.session_state:
+    st.session_state.most_replayed_path = None
+
 # st.write(st.session_state)
 st.title('YouTube分析🚀', help='Livechatまたはリプレイ情報が存在するにもかかわらず  \nエラーになった場合はページを再度読み込んでください')
 
@@ -547,6 +558,17 @@ submit_btn = st.button('Submit')
 # cancel_btn = st.form_submit_button('Cancel')
 
 if submit_btn or st.session_state.Submit:
+    if os.path.exists(st.session_state.live_chat_path):
+        os.remove(st.session_state.live_chat_path)
+        print(f"{st.session_state.live_chat_path} を削除しました。")
+    else:
+        print(f"{st.session_state.live_chat_path} は存在しません。")
+
+    if os.path.exists(st.session_state.most_replayed_path):
+        os.remove(st.session_state.most_replayed_path)
+        print(f"{st.session_state.most_replayed_path} を削除しました。")
+    else:
+        print(f"{st.session_state.most_replayed_path} は存在しません。")
     st.session_state.Submit = True
     if not (url.startswith("https://www.youtube.com/watch?v=") or url.startswith("https://youtu.be/")):
         ErrorMessage('URL')
@@ -587,11 +609,11 @@ if submit_btn or st.session_state.Submit:
         with st.expander('リプレイ回数データ'):
             json_data = GetMostReplayedFromBrowser()
             FormatMostReplayed(json_data)
-            try:
-                TimeDelta_StartTime, TimeDelta_EndTime, Seconds_StartTime, Seconds_EndTime, TimeDeltaList, IntensityList, df, df_sorted = GetMostReplayedInformation()
-            except:
-                ErrorMessage('Replay')
-                exit()
+            # try:
+            TimeDelta_StartTime, TimeDelta_EndTime, Seconds_StartTime, Seconds_EndTime, TimeDeltaList, IntensityList, df, df_sorted = GetMostReplayedInformation()
+            # except:
+            #     ErrorMessage('Replay')
+            #     exit()
             st.session_state.MostReplayed = True
             ShowReplayChart(df)
             ShowMostReplayRange(TimeDelta_StartTime, TimeDelta_EndTime)
@@ -604,6 +626,110 @@ if submit_btn or st.session_state.Submit:
                 os.remove(Filename)
             ShowReplayDataframe(IntensityList, TimeDeltaList, Seconds_StartTime, Seconds_EndTime, df, df_sorted)
         st.success('完了しました。')
+
+@st.cache_resource(max_entries=1, show_spinner='ロード中😍')
+def VideoDownloader(username, password):
+    if Format == 'mp4+m4a(IOSの場合はこちらを選択してください)':
+        VideoFormat = 'bestvideo+bestaudio[ext=m4a]/best'
+    else:
+        VideoFormat = 'bestvideo+bestaudio/best'
+
+    ydl_options={
+        "format" : VideoFormat,
+        'outtmpl': '%(title)s[%(id)s].%(ext)s',
+        'username': username,
+        'password': password
+    }
+
+    with YoutubeDL(ydl_options) as ydl:
+        info = ydl.extract_info(UrlForDownload)
+        Filename = ydl.prepare_filename(info)
+        convert = FindResolutions(info)
+        try:                
+            if Format == 'mp4' or (Format == 'mp4+m4a(IOSの場合はこちらを選択してください)' and convert):
+                Filename = ConvertToMP4(Filename, info)
+        except:
+            ErrorMessage('Convert')
+            exit()
+        st.markdown('Video Preview')
+        st.video(Filename)
+    return Filename, info
+
+def VideoDownloadBtn(Filename):
+    with open (Filename, 'rb') as data:
+        btn = st.download_button(label=':red[Download]🍿', data=data, file_name=Filename, mime='video/mp4')
+
+@st.cache_data(max_entries=1, show_spinner='ロード中😍')
+def AudioDownloader():
+    ydl_options={
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '0'
+        }],
+        # 'outtmpl': '%(title)s[%(id)s].mp3'
+        # 'cookiesfrombrowser': ('chrome', )
+    }
+    with YoutubeDL(ydl_options) as ydl:
+        info = ydl.extract_info(UrlForDownload)
+        Filename = ydl.prepare_filename(info)
+        Filename = Filename.replace('.webm', '.mp3').replace('.mp4', '.mp3')
+        st.markdown('Sound Preview')
+        st.audio(Filename, format="audio/mp3")
+    return Filename
+
+def AudioDownloadBtn(Filename):
+    with open (Filename, 'rb') as data:
+        st.download_button(label=':red[Download]🎵', data=data, file_name=Filename, mime='audio/mp3')
+
+def OnChangeVideo(Filename):
+    if not Filename == None:
+        os.remove(Filename)
+    VideoDownloader.clear()
+
+def OnChangeAudio():
+    AudioDownloader.clear()
+
+def ConvertToMP4(Filename, info):
+    WebmFilename = Filename
+    if Format == 'mp4':
+        MP4Filename = Filename.replace('.webm', '.mp4')
+    if Format == 'mp4+m4a(IOSの場合はこちらを選択してください)':
+        MP4Filename = Filename.replace('.mkv', '.mp4')
+    if os.path.exists(MP4Filename):
+        if not info['ext'] == 'mp4':
+            os.remove(MP4Filename)
+    if Format == 'mp4':
+        if not info['ext'] == 'mp4':
+            command = f'ffmpeg -i "{WebmFilename}" -c:v copy -c:a copy "{MP4Filename}"'
+            subprocess.run(command, shell=True)
+    if Format == 'mp4+m4a(IOSの場合はこちらを選択してください)':
+        with st.spinner('H.264に圧縮中'):
+            command = f'ffmpeg -i "{WebmFilename}" -c:v libx264 -profile:v high -level:v 4.0 -crf 22 -c:a copy "{MP4Filename}"'
+            subprocess.run(command, shell=True)
+    if not info['ext'] == 'mp4':
+        os.remove(WebmFilename)
+    return MP4Filename
+
+def FindResolutions(info):
+    ResolutionCount = 0
+    HighResolutions = 0
+    ErrorCount = 0
+    while(True):
+        try:
+            resolution = info['formats'][ResolutionCount]['resolution']
+            resolutions.append(resolution)
+
+            vcodec = info['formats'][ResolutionCount]['vcodec']
+            vcodecs.append(vcodec)
+            ResolutionCount+=1
+        except:
+            ErrorCount+=1
+            break
+
+# 字幕のファイルでmost replayedを入れる　選択肢１：全体のグラフ　選択肢２：数字のみとmost replayedは"most replayed"という文字
+# 字幕のファイルでライブチャットを入れる
 
 st.title('動画ダウンロード🚀', help='最高品質でダウンロードできます！(webm, mp4, mp3)  \n*YouTube以外にも対応しています(詳細は右上の三本線から"Get help"をクリック)  \n*ログインが必要なサイトの動画はダウンロードできません  \n*音声または映像が再生されない場合は動画再生アプリを変更してください(推奨: VLC Media Player)  \n*スマートフォンのための処理(mp4+m4a)は大変重いため再生されない場合があります。再生されなかった場合は別の動画をお試しください。  \nユーザー名/パスワードはダウンロードする際にログインが必要な場合のみ打ち込んでください！')
 with st.form(key='download'):
